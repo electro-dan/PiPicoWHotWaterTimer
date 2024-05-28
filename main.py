@@ -1,0 +1,280 @@
+import os
+import time
+import ntptime
+from time import sleep
+import uasyncio
+from machine import Pin
+from RequestParser import RequestParser
+from ResponseBuilder import ResponseBuilder
+from WiFiConnection import WiFiConnection
+from machine import WDT
+from machine import Timer
+
+# Watchdog timer - set to 8 seconds to allow enough time for WiFi connect attempts
+# Will reset the Pico if unresponsive after 8 seconds. Use wdt.feed() to indicate 'alive'
+wdt = WDT(timeout=8000) #timeout is in ms
+ 
+# heating trigger pin
+heating_pin = Pin(16, Pin.OUT)
+# manual boost button
+boost_pin = Pin(28, Pin.IN, Pin.PULL_UP)
+
+is_heating = False
+heating_state = True # Default to on
+boost_timer = 1800 # timer in seconds (30 minutes)
+boost_timer_countdown = 0 # timer in seconds
+
+# list of timers
+# timer list contains days (bitmask of 127), on time in minutes, off time in minutes
+timers = [
+    [127, 450, 390],
+    [0, 420, 420],
+    [0, 420, 420],
+    [0, 420, 420],
+    [0, 420, 420],
+    [0, 420, 420]
+]
+
+# coroutine to handle HTTP request
+async def handle_request(reader, writer):
+    global heating_state
+    global boost_timer_countdown
+    global timers
+    try:
+        # await allows other tasks to run while waiting for data
+        raw_request = await reader.read(2048)
+
+        request = RequestParser(raw_request)
+
+        response_builder = ResponseBuilder()
+
+        # filter out api request
+        if request.url_match("/api"):
+            action = request.get_action()
+            if action == 'get_status':
+                current_day = time.localtime()[6] + 1
+                current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+                response_obj = {
+                    'status': 'OK',
+                    'current_day': current_day,
+                    'current_time': current_time,
+                    'heating_state': heating_state,
+                    'is_heating': is_heating,
+                    'boost_timer_countdown': boost_timer_countdown,
+                    'timers': timers
+                }
+                response_builder.set_body_from_dict(response_obj)
+            elif action == "boost":
+                if boost_timer_countdown == 0:
+                    boost_timer_countdown = boost_timer
+                else:
+                    boost_timer_countdown = 0
+                
+                response_obj = {
+                    'status': 'OK',
+                    'boost_timer_countdown': boost_timer_countdown
+                }
+                response_builder.set_body_from_dict(response_obj)
+            elif action == 'trigger_heating':
+                # Permanently turn heating off (holiday mode) or on
+                heating_state = not heating_state
+               
+                response_obj = {
+                    'status': 'OK',
+                    'heating_state': heating_state
+                }
+                response_builder.set_body_from_dict(response_obj)
+            elif action == "set_timer":
+                # Set off time
+                timer_number = request.data()['timer_number']
+                on_or_off = request.data()['on_or_off']
+                new_time = int(request.data()['new_time'])
+                if new_time >= 0 and new_time <= 1410:
+                    if on_or_off == "On":
+                        timers[timer_number - 1][1] = new_time
+                    else:
+                        timers[timer_number - 1][2] = new_time
+                    save_data()
+                    response_obj = {
+                        'status': 'OK',
+                        'timer_number': timer_number,
+                        'time_set': new_time
+                    }
+                    response_builder.set_body_from_dict(response_obj)
+                else:
+                    response_obj = {
+                        'status': 'ERROR',
+                        'message': "Invalid time sent"
+                    }
+                    response_builder.set_body_from_dict(response_obj)
+                    response_builder.set_status(400)
+            elif action == "set_timer_days":
+                # Set off time
+                timer_number = int(request.data()['timer_number'])
+                timer_day = int(request.data()['day'])
+                if timer_day >= 0 and timer_day <= 7:
+                    # mask with the nth bit set
+                    timer_day_mask = 1 << (timer_day - 1)
+                    current_timer_days = timers[timer_number - 1][0]
+                    # toggle the bit with xor
+                    new_timer_days = current_timer_days ^ timer_day_mask
+                    timers[timer_number - 1][0] = new_timer_days
+                    save_data()
+                    response_obj = {
+                        'status': 'OK',
+                        'timer_number': timer_number,
+                        'new_timer_days': new_timer_days
+                    }
+                    response_builder.set_body_from_dict(response_obj)
+                else:
+                    response_obj = {
+                        'status': 'ERROR',
+                        'message': "Invalid time sent"
+                    }
+                    response_builder.set_body_from_dict(response_obj)
+                    response_builder.set_status(400)
+
+
+            else:
+                # unknown action
+                response_builder.set_status(404)
+
+        # try to serve static file
+        else:
+            response_builder.serve_static_file(request.url, "/index.html")
+
+        # build response message
+        response_builder.build_response()
+        # send response back to client
+        writer.write(response_builder.response)
+        # allow other tasks to run while data being sent
+        await writer.drain()
+        await writer.wait_closed()
+
+    except OSError as e:
+        print('connection error ' + str(e.errno) + " " + str(e))
+
+def wait_pin_change(pin):
+    # wait for pin to change value
+    # it needs to be stable for a continuous 20ms
+    cur_value = pin.value()
+    active = 0
+    while active < 20:
+        if pin.value() != cur_value:
+            active += 1
+        else:
+            active = 0
+        pyb.delay(1)
+
+# main coroutine to boot async tasks
+async def main():
+    # start web server task
+    print('Setting up webserver...')
+    server = uasyncio.start_server(handle_request, "0.0.0.0", 80)
+    uasyncio.create_task(server)
+
+    # Time will be in UTC only
+    ntptime.settime()
+    print(time.localtime())
+
+    # start the heater task
+    print('Starting heater scheduler...')
+    while True:
+        # Connect to WiFi if disconnected
+        if not WiFiConnection.is_connected():
+            if not WiFiConnection.do_connect(True):
+                raise RuntimeError('network connection failed')
+        
+        wdt.feed() # Reset watchdog
+
+        global heating_state
+        global is_heating
+        global timers
+        global boost_timer_countdown
+
+        # Convert local time into minutes since midnight
+        current_day = time.localtime()[6] + 1
+        current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+        # Iterate through timers
+        is_heating = False
+        # If heating is enabled
+        if heating_state:
+            for timer in timers:
+                # if timer is enabled for today (bitwise AND)
+                if current_day & timer[0]:
+                    # If the on and off timer are not the same
+                    if timer[1] != timer[2]:
+                        # If the current time is between the on and off times, enable heating
+                        if current_time > timer[1] and current_time < timer[2]:
+                            is_heating = True
+
+            if boost_timer_countdown > 0:
+                is_heating = True
+                boost_timer_countdown -= 1 # take off 1 second
+
+        # Enable or disable the output
+        heating_pin.value(is_heating)
+
+        # Check button
+        if not boost_pin.value():
+            # If button is pressed, start a 300ms timer to debounce
+            tim = Timer(period=300, mode=Timer.ONE_SHOT, callback=lambda t:do_boost())
+
+        # Loop sleeps 1 second
+        await uasyncio.sleep(1)
+
+        wdt.feed() # Reset watchdog
+
+def do_boost():
+    global boost_timer_countdown
+    # If button is still pressed
+    if not boost_pin.value():
+        # Set or reset boost countdown
+        if boost_timer_countdown == 0:
+            boost_timer_countdown = boost_timer
+        else:
+            boost_timer_countdown = 0
+    
+
+# Save variables to the eeprom
+def save_data():
+    print('Saving variables...')
+    with open('config.txt', 'w') as f:
+        for timer in timers:
+            str_data = str(timer[0]) + "|" + str(timer[1]) + "|" + str(timer[2]) + "\n"
+            f.write(str_data)
+
+# Read variables from the eeprom - done at boot
+def read_data():
+    global timers
+
+    with open('config.txt', 'r') as f:
+        file_lines = f.readlines()
+ 
+        count = 0
+        # Strips the newline character
+        for file_line in file_lines:
+            timer_list = file_line.strip().split('|')
+            if len(timer_list) == 3:
+                if count < 7:
+                    timers[count][0] = int(timer_list[0])
+                    timers[count][1] = int(timer_list[1])
+                    timers[count][2] = int(timer_list[2])
+                count += 1
+
+# Entry Here
+# Connect to WiFi
+if not WiFiConnection.do_connect(True):
+    raise RuntimeError('network connection failed')
+wdt.feed() # Reset watchdog
+
+# Read any existing saved data
+read_data()
+
+# start asyncio task and loop
+try:
+    # start the main async tasks
+    uasyncio.run(main())
+finally:
+    # reset and start a new event loop for the task scheduler
+    uasyncio.new_event_loop()
