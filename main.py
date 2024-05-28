@@ -19,7 +19,7 @@ heating_pin = Pin(16, Pin.OUT)
 # manual boost button
 boost_pin = Pin(28, Pin.IN, Pin.PULL_UP)
 
-is_heating = False
+is_heating = False # Default to off
 heating_state = True # Default to on
 boost_timer = 1800 # timer in seconds (30 minutes)
 boost_timer_countdown = 0 # timer in seconds
