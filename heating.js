@@ -1,6 +1,5 @@
 var isChanging = false;
 var changingTimeout;
-var statusInterval;
 
 // Called on load, then every second
 function getStatus() {
@@ -18,8 +17,6 @@ function getStatus() {
             document.getElementById("boostTimer").innerHTML = formatCountdown(json_response.boost_timer_countdown);
             document.getElementById("heatingState").innerHTML = (json_response.heating_state ? "ENABLED" : "DISABLED");
             document.getElementById("isHeating").innerHTML = (json_response.is_heating ? "ON" : "OFF");
-            if (json_response.boost_timer_countdown == 0)
-                clearInterval(statusInterval);
             if (!isChanging) {
                 const timerArr = json_response.timers;
                 var timer = 1;
@@ -34,6 +31,9 @@ function getStatus() {
                     document.getElementById("t" + timer + "Off").innerHTML = formatTime(timerArr[i][2]);
                     document.getElementById("t" + timer + "OffInput").value = timerArr[i][2];
                 }
+            }
+            if (json_response.boost_timer_countdown != "0") {
+                setTimeout(getStatus, 450);
             }
         }
     }
@@ -100,7 +100,7 @@ function triggerBoost() {
             // reset led indicator to none
             document.getElementById("boostTimer").innerHTML = formatCountdown(json_response.boost_timer_countdown);
             // Get the status every second whilst boost is active
-            statusInterval = setInterval(getStatus, 1000);
+            setTimeout(getStatus, 450);
         } else {
             alert("Error setting target temperature");
         }
@@ -209,7 +209,6 @@ function formatCountdown(countdownIn) {
     return String(Math.floor(countdownIn / 60)).padStart(2, "0") + ":" + String(countdownIn % 60).padStart(2, "0");
 }
 
-//setInterval(getStatus, 1000);
 // Read status when page is focused
 window.onfocus = function() {
     getStatus();

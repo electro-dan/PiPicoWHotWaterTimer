@@ -15,9 +15,10 @@ from machine import Timer
 wdt = WDT(timeout=8000) #timeout is in ms
  
 # heating trigger pin
-heating_pin = Pin(16, Pin.OUT)
+heating_pin_trig = Pin(28, Pin.OUT)
+heating_pin_hold = Pin(27, Pin.OUT)
 # manual boost button
-boost_pin = Pin(28, Pin.IN, Pin.PULL_UP)
+boost_pin = Pin(18, Pin.IN, Pin.PULL_UP)
 
 is_heating = False # Default to off
 heating_state = True # Default to on
@@ -174,11 +175,11 @@ async def main():
     uasyncio.create_task(server)
 
     # Time will be in UTC only
-    ntptime.settime()
+    #ntptime.settime()
     print(time.localtime())
 
     # start the heater task
-    print('Starting heater scheduler...')
+    print('Starting hot water scheduler...')
     while True:
         # Connect to WiFi if disconnected
         if not WiFiConnection.is_connected():
@@ -213,7 +214,11 @@ async def main():
                 boost_timer_countdown -= 1 # take off 1 second
 
         # Enable or disable the output
-        heating_pin.value(is_heating)
+        if is_heating:
+            if do_relay_activate():
+                tim = Timer(period=300, mode=Timer.ONE_SHOT, callback=lambda t:do_relay_hold())
+        else:
+            do_relay_deactivate()
 
         # Check button
         if not boost_pin.value():
@@ -235,6 +240,25 @@ def do_boost():
         else:
             boost_timer_countdown = 0
     
+# Used to activate the relay
+def do_relay_activate():
+    if heating_pin_hold.value() == 0 & heating_pin_trig.value() == 0:
+        heating_pin_hold.value(0)
+        heating_pin_trig.value(1)
+        return True
+    else:
+        return False
+
+# Used to hold relay after activating
+def do_relay_hold():
+    if heating_pin_trig.value() == 1:
+        heating_pin_hold.value(1)
+        heating_pin_trig.value(0)
+
+# Used to deactivate the relay
+def do_relay_deactivate():
+    heating_pin_hold.value(0)
+    heating_pin_trig.value(0)
 
 # Save variables to the eeprom
 def save_data():
