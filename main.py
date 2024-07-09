@@ -155,39 +155,10 @@ async def handle_request(reader, writer):
     except OSError as e:
         print('connection error ' + str(e.errno) + " " + str(e))
 
-def wait_pin_change(pin):
-    # wait for pin to change value
-    # it needs to be stable for a continuous 20ms
-    cur_value = pin.value()
-    active = 0
-    while active < 20:
-        if pin.value() != cur_value:
-            active += 1
-        else:
-            active = 0
-        pyb.delay(1)
-
-# main coroutine to boot async tasks
-async def main():
-    # start web server task
-    print('Setting up webserver...')
-    server = uasyncio.start_server(handle_request, "0.0.0.0", 80)
-    uasyncio.create_task(server)
-
-    # Time will be in UTC only
-    #ntptime.settime()
-    print(time.localtime())
-
-    # start the heater task
-    print('Starting hot water scheduler...')
+async def timer_check():
+    print('Timer loop started')
+    
     while True:
-        # Connect to WiFi if disconnected
-        if not WiFiConnection.is_connected():
-            if not WiFiConnection.do_connect(True):
-                raise RuntimeError('network connection failed')
-        
-        wdt.feed() # Reset watchdog
-
         global heating_state
         global is_heating
         global timers
@@ -213,20 +184,57 @@ async def main():
                 is_heating = True
                 boost_timer_countdown -= 1 # take off 1 second
 
-        # Enable or disable the output
-        if is_heating:
-            if do_relay_activate():
-                tim = Timer(period=300, mode=Timer.ONE_SHOT, callback=lambda t:do_relay_hold())
-        else:
-            do_relay_deactivate()
+        # Loop sleeps 1 second
+        await uasyncio.sleep(1)
+
+        wdt.feed() # Reset watchdog
+
+
+
+async def main():
+    # start web server task
+    print('Setting up webserver...')
+    server = uasyncio.start_server(handle_request, "0.0.0.0", 80)
+    uasyncio.create_task(server)
+
+    # Time will be in UTC only
+    #ntptime.settime()
+    print(time.localtime())
+
+    # Start the timer task
+    print('Starting timer...')
+    uasyncio.create_task(timer_check())
+
+    # start the heater task
+    print('Starting hot water scheduler...')
+    while True:
+        # Connect to WiFi if disconnected
+        if not WiFiConnection.is_connected():
+            # try to connect again
+            WiFiConnection.do_connect(True)
+            # don't raise error so that timers still work with no Wi-Fi
+            #if not WiFiConnection.do_connect(True):
+                #raise RuntimeError('network connection failed')
+        
+        global is_heating
 
         # Check button
         if not boost_pin.value():
-            # If button is pressed, start a 300ms timer to debounce
-            tim = Timer(period=300, mode=Timer.ONE_SHOT, callback=lambda t:do_boost())
+            # If button is pressed, start a 50ms timer to debounce
+            await uasyncio.sleep_ms(50)
+            do_boost()
+            # add push and hold handling
 
-        # Loop sleeps 1 second
-        await uasyncio.sleep(1)
+        # Enable or disable the output
+        if is_heating:
+            if do_relay_activate():
+                # After activating relay, switch to 'hold' state after 300ms
+                await uasyncio.sleep_ms(300)
+                do_relay_hold()
+        else:
+            do_relay_deactivate()
+
+        await uasyncio.sleep_ms(300)
 
         wdt.feed() # Reset watchdog
 
