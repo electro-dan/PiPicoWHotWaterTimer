@@ -12,13 +12,14 @@ from machine import Timer
 
 # Watchdog timer - set to 8 seconds to allow enough time for WiFi connect attempts
 # Will reset the Pico if unresponsive after 8 seconds. Use wdt.feed() to indicate 'alive'
-wdt = WDT(timeout=8000) #timeout is in ms
- 
+#wdt = WDT(timeout=8000) #timeout is in ms
+
 # heating trigger pin
 heating_pin_trig = Pin(28, Pin.OUT)
 heating_pin_hold = Pin(27, Pin.OUT)
 # manual boost button
 boost_pin = Pin(18, Pin.IN, Pin.PULL_UP)
+button_state = 0xFFFF
 
 is_heating = False # Default to off
 heating_state = True # Default to on
@@ -155,55 +156,67 @@ async def handle_request(reader, writer):
     except OSError as e:
         print('connection error ' + str(e.errno) + " " + str(e))
 
-async def timer_check():
-    print('Timer loop started')
-    
+def timer_check_interrupt(pin):
+    global heating_state
+    global is_heating
+    global timers
+    global boost_timer_countdown
+
+    # Convert local time into minutes since midnight
+    current_day = time.localtime()[6] + 1
+    current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+    # Iterate through timers
+    is_heating = False
+    # If heating is enabled
+    if heating_state:
+        for timer in timers:
+            # if timer is enabled for today (bitwise AND)
+            if current_day & timer[0]:
+                # If the on and off timer are not the same
+                if timer[1] != timer[2]:
+                    # If the current time is between the on and off times, enable heating
+                    if current_time > timer[1] and current_time < timer[2]:
+                        is_heating = True
+
+        if boost_timer_countdown > 0:
+            is_heating = True
+            boost_timer_countdown -= 1 # take off 1 second
+
+def relay_timer_interrupt(pin):
+    # Enable or disable the output
+    if is_heating:
+        # Run hold first - this will switch the relay into hold state if last run was to activate
+        do_relay_hold()
+        # This will activate the relay if it is off or not in hold state
+        do_relay_activate()
+    else:
+        do_relay_deactivate()
+
+async def button_handler():
+    global is_heating
+    global button_state
+
     while True:
-        global heating_state
-        global is_heating
-        global timers
-        global boost_timer_countdown
+        # based on https://www.e-tinkers.com/2021/05/the-simplest-button-debounce-solution/
+        button_state = ((button_state << 1) | boost_pin.value() | 0xfe00) & 0xFFFF
 
-        # Convert local time into minutes since midnight
-        current_day = time.localtime()[6] + 1
-        current_time = (time.localtime()[3] * 60) + time.localtime()[4]
-        # Iterate through timers
-        is_heating = False
-        # If heating is enabled
-        if heating_state:
-            for timer in timers:
-                # if timer is enabled for today (bitwise AND)
-                if current_day & timer[0]:
-                    # If the on and off timer are not the same
-                    if timer[1] != timer[2]:
-                        # If the current time is between the on and off times, enable heating
-                        if current_time > timer[1] and current_time < timer[2]:
-                            is_heating = True
-
-            if boost_timer_countdown > 0:
-                is_heating = True
-                boost_timer_countdown -= 1 # take off 1 second
-
-        # Loop sleeps 1 second
-        await uasyncio.sleep(1)
-
-        wdt.feed() # Reset watchdog
-
-
+        # Check button
+        if button_state == 0xFF00:
+            do_boost()
+        
+        await uasyncio.sleep_ms(5)
 
 async def main():
+    # Start the timer task
+    print('Starting hardware...')
+    uasyncio.create_task(button_handler())
+
     # start web server task
     print('Setting up webserver...')
     server = uasyncio.start_server(handle_request, "0.0.0.0", 80)
     uasyncio.create_task(server)
 
-    # Time will be in UTC only
-    #ntptime.settime()
-    print(time.localtime())
-
-    # Start the timer task
-    print('Starting timer...')
-    uasyncio.create_task(timer_check())
+    updated_today = False
 
     # start the heater task
     print('Starting hot water scheduler...')
@@ -211,32 +224,32 @@ async def main():
         # Connect to WiFi if disconnected
         if not WiFiConnection.is_connected():
             # try to connect again
-            WiFiConnection.do_connect(True)
-            # don't raise error so that timers still work with no Wi-Fi
-            #if not WiFiConnection.do_connect(True):
-                #raise RuntimeError('network connection failed')
-        
-        global is_heating
-
-        # Check button
-        if not boost_pin.value():
-            # If button is pressed, start a 50ms timer to debounce
-            await uasyncio.sleep_ms(50)
-            do_boost()
-            # add push and hold handling
-
-        # Enable or disable the output
-        if is_heating:
-            if do_relay_activate():
-                # After activating relay, switch to 'hold' state after 300ms
-                await uasyncio.sleep_ms(300)
-                do_relay_hold()
+            print('WiFi connect...')
+            if WiFiConnection.do_connect(True):
+                # Time will be in UTC only
+                try:
+                    ntptime.settime()
+                except:
+                    print("NTP timeout")
+                finally:
+                    print(time.localtime())
         else:
-            do_relay_deactivate()
+            # After midnight, update NTP time once a day
+            if time.localtime()[3] == 0:
+                if not updated_today:
+                    try:
+                        ntptime.settime()
+                        updated_today = True
+                    except:
+                        print("NTP timeout")
+                    finally:
+                        print(time.localtime())
+            else:
+                updated_today = False
 
-        await uasyncio.sleep_ms(300)
+        await uasyncio.sleep_ms(2000)
 
-        wdt.feed() # Reset watchdog
+        #wdt.feed() # Reset watchdog
 
 def do_boost():
     global boost_timer_countdown
@@ -295,13 +308,11 @@ def read_data():
                 count += 1
 
 # Entry Here
-# Connect to WiFi
-if not WiFiConnection.do_connect(True):
-    raise RuntimeError('network connection failed')
-wdt.feed() # Reset watchdog
-
 # Read any existing saved data
 read_data()
+
+timer_check = Timer(mode=Timer.PERIODIC, period=1000, callback=timer_check_interrupt)
+relay_timer = Timer(mode=Timer.PERIODIC, period=300, callback=relay_timer_interrupt)
 
 # start asyncio task and loop
 try:
