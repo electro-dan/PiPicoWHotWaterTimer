@@ -156,6 +156,8 @@ async def handle_request(reader, writer):
     except OSError as e:
         print('connection error ' + str(e.errno) + " " + str(e))
 
+# Main timer interrupt - runs every second
+# This will activate / deactivate hot water based on whether the local time is within an active timer
 def timer_check_interrupt(pin):
     global heating_state
     global is_heating
@@ -192,6 +194,9 @@ def relay_timer_interrupt(pin):
     else:
         do_relay_deactivate()
 
+# This function runs constantly and polls the push button with debounce handling
+# It shifts the button status into a variable (capped at 16-bits) and compares to a mask
+# Result is this function reliably detects a valid push, without triggering multiple times
 async def button_handler():
     global is_heating
     global button_state
@@ -206,6 +211,7 @@ async def button_handler():
         
         await uasyncio.sleep_ms(5)
 
+# main coroutine to boot async tasks
 async def main():
     # Start the timer task
     print('Starting hardware...')
@@ -218,9 +224,8 @@ async def main():
 
     updated_today = False
 
-    # start the heater task
-    print('Starting hot water scheduler...')
     while True:
+        # This loop just monitors the WiFi connection and tries re-connects if disconnected
         # Connect to WiFi if disconnected
         if not WiFiConnection.is_connected():
             # try to connect again
@@ -251,6 +256,7 @@ async def main():
 
         #wdt.feed() # Reset watchdog
 
+# Activates the override boost timer
 def do_boost():
     global boost_timer_countdown
     # If button is still pressed
@@ -311,7 +317,9 @@ def read_data():
 # Read any existing saved data
 read_data()
 
+# Start a timer to interrupt every 1 second
 timer_check = Timer(mode=Timer.PERIODIC, period=1000, callback=timer_check_interrupt)
+# Start a timer to interrupt every 300 milliseconds
 relay_timer = Timer(mode=Timer.PERIODIC, period=300, callback=relay_timer_interrupt)
 
 # start asyncio task and loop
