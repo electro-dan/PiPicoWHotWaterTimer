@@ -35,6 +35,7 @@
     .card {
       background-color: white;
       box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+      position: relative;
     }
     @media (prefers-color-scheme: dark) {
       .card {
@@ -63,6 +64,19 @@
         font-size: 1.5rem;
         padding: 0.5rem;
         margin-top: 0.5rem;
+    }
+    .smallbtn {
+      position: absolute;
+      right: 15px;
+      top: 5px;
+      width: 50px;
+    }
+    .cancel {
+      position: absolute;
+      left: 15px;
+      top: 5px;
+      width: 50px;
+      display: none;
     }
     input[type=range] {
       width: 250px;
@@ -126,31 +140,32 @@
         </div>
         <div class="card">
           <h2>
-            Timer 1
+            Timer 1 <button id="btnT1" class="smallbtn" onclick="editTimer(1)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(1)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t1Day1" oninput="setDay(1,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t1Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t1Day2" oninput="setDay(1,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t1Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t1Day3" oninput="setDay(1,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t1Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t1Day4" oninput="setDay(1,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t1Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t1Day5" oninput="setDay(1,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t1Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t1Day6" oninput="setDay(1,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t1Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t1Day7" oninput="setDay(1,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t1Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -158,41 +173,42 @@
           <p>
             ON: <span id="t1On">12:00 AM</span>
             <br>
-            <input id="t1OnInput" onchange="setTime(1, 'On')" oninput="moveTime(1, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t1OnInput" oninput="moveTime(1, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t1Off">12:00 AM</span>
             <br>
-            <input id="t1OffInput" onchange="setTime(1, 'Off')" oninput="moveTime(1, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t1OffInput" oninput="moveTime(1, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
         <div class="card">
           <h2>
-            Timer 2
+            Timer 2 <button id="btnT2" class="smallbtn" onclick="editTimer(2)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(2)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t2Day1" oninput="setDay(2,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t2Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t2Day2" oninput="setDay(2,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t2Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t2Day3" oninput="setDay(2,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t2Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t2Day4" oninput="setDay(2,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t2Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t2Day5" oninput="setDay(2,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t2Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t2Day6" oninput="setDay(2,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t2Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t2Day7" oninput="setDay(2,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t2Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -200,41 +216,42 @@
           <p>
             ON: <span id="t2On">12:00 AM</span>
             <br>
-            <input id="t2OnInput" onchange="setTime(2, 'On')" oninput="moveTime(2, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t2OnInput" oninput="moveTime(2, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t2Off">12:00 AM</span>
             <br>
-            <input id="t2OffInput" onchange="setTime(2, 'Off')" oninput="moveTime(2, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t2OffInput" oninput="moveTime(2, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
         <div class="card">
           <h2>
-            Timer 3
+            Timer 3 <button id="btnT13" class="smallbtn" onclick="editTimer(3)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(3)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t3Day1" oninput="setDay(3,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t3Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t3Day2" oninput="setDay(3,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t3Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t3Day3" oninput="setDay(3,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t3Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t3Day4" oninput="setDay(3,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t3Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t3Day5" oninput="setDay(3,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t3Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t3Day6" oninput="setDay(3,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t3Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t3Day7" oninput="setDay(3,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t3Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -242,41 +259,42 @@
           <p>
             ON: <span id="t3On">12:00 AM</span>
             <br>
-            <input id="t3OnInput" onchange="setTime(3, 'On')" oninput="moveTime(3, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t3OnInput" oninput="moveTime(3, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t3Off">12:00 AM</span>
             <br>
-            <input id="t3OffInput" onchange="setTime(3, 'Off')" oninput="moveTime(3, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t3OffInput" oninput="moveTime(3, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
         <div class="card">
           <h2>
-            Timer 4
+            Timer 4 <button id="btnT4" class="smallbtn" onclick="editTimer(4)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(4)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t4Day1" oninput="setDay(4,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t4Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t4Day2" oninput="setDay(4,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t4Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t4Day3" oninput="setDay(4,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t4Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t4Day4" oninput="setDay(4,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t4Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t4Day5" oninput="setDay(4,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t4Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t4Day6" oninput="setDay(4,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t4Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t4Day7" oninput="setDay(4,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t4Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -284,41 +302,42 @@
           <p>
             ON: <span id="t4On">12:00 AM</span>
             <br>
-            <input id="t4OnInput" onchange="setTime(4, 'On')" oninput="moveTime(4, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t4OnInput" oninput="moveTime(4, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t4Off">12:00 AM</span>
             <br>
-            <input id="t4OffInput" onchange="setTime(4, 'Off')" oninput="moveTime(4, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t4OffInput" oninput="moveTime(4, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
         <div class="card">
           <h2>
-            Timer 5
+            Timer 5 <button id="btnT5" class="smallbtn" onclick="editTimer(5)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(5)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t5Day1" oninput="setDay(5,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t5Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t5Day2" oninput="setDay(5,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t5Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t5Day3" oninput="setDay(5,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t5Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t5Day4" oninput="setDay(5,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t5Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t5Day5" oninput="setDay(5,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t5Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t5Day6" oninput="setDay(5,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t5Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t5Day7" oninput="setDay(5,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t5Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -326,41 +345,42 @@
           <p>
             ON: <span id="t5On">12:00 AM</span>
             <br>
-            <input id="t5OnInput" onchange="setTime(5, 'On')" oninput="moveTime(5, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t5OnInput" oninput="moveTime(5, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t5Off">12:00 AM</span>
             <br>
-            <input id="t5OffInput" onchange="setTime(5, 'Off')" oninput="moveTime(5, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t5OffInput" oninput="moveTime(5, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
         <div class="card">
           <h2>
-            Timer 6
+            Timer 6 <button id="btnT6" class="smallbtn" onclick="editTimer(6)">&#x1F589;</button>
+            <button id="btnC1" class="cancel" onclick="cancelTimer(6)">&#x27F2;</button>
           </h2>
           <p>
             <table>
               <tr>
                 <td class="tday">
-                  <label>M<br><input id="t6Day1" oninput="setDay(6,1)" type="checkbox" value="0"></label>
+                  <label>M<br><input id="t6Day1" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t6Day2" oninput="setDay(6,2)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t6Day2" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>W<br><input id="t6Day3" oninput="setDay(6,3)" type="checkbox" value="0"></label>
+                  <label>W<br><input id="t6Day3" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>T<br><input id="t6Day4" oninput="setDay(6,4)" type="checkbox" value="0"></label>
+                  <label>T<br><input id="t6Day4" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>F<br><input id="t6Day5" oninput="setDay(6,5)" type="checkbox" value="0"></label>
+                  <label>F<br><input id="t6Day5" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t6Day6" oninput="setDay(6,6)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t6Day6" type="checkbox" value="0" disabled></label>
                 </td>
                 <td class="tday">
-                  <label>S<br><input id="t6Day7" oninput="setDay(6,7)" type="checkbox" value="0"></label>
+                  <label>S<br><input id="t6Day7" type="checkbox" value="0" disabled></label>
                 </td>
               </tr>
             </table>
@@ -368,12 +388,12 @@
           <p>
             ON: <span id="t6On">12:00 AM</span>
             <br>
-            <input id="t6OnInput" onchange="setTime(6, 'On')" oninput="moveTime(6, 'On')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t6OnInput" oninput="moveTime(6, 'On')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
           <p>
             OFF: <span id="t6Off">12:00 AM</span>
             <br>
-            <input id="t6OffInput" onchange="setTime(6, 'Off')" oninput="moveTime(6, 'Off')" type="range" min="0" max="1410" step="15" value="0">
+            <input id="t6OffInput" oninput="moveTime(6, 'Off')" type="range" min="0" max="1410" step="15" value="0" disabled>
           </p>
         </div>
       </div>

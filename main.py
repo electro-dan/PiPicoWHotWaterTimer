@@ -87,56 +87,39 @@ async def handle_request(reader, writer):
                 }
                 response_builder.set_body_from_dict(response_obj)
             elif action == "set_timer":
-                # Set off time
+                error_message = ""
                 timer_number = request.data()['timer_number']
-                on_or_off = request.data()['on_or_off']
-                new_time = int(request.data()['new_time'])
-                if new_time >= 0 and new_time <= 1410:
-                    if on_or_off == "On":
-                        timers[timer_number - 1][1] = new_time
-                    else:
-                        timers[timer_number - 1][2] = new_time
+                new_days = int(request.data()['new_days'])
+                new_on_time = int(request.data()['new_on_time'])
+                new_off_time = int(request.data()['new_off_time'])
+                if timer_number < 1 or timer_number > 6:
+                    error_message = "Invalid timer number"
+                elif new_days < 0 or new_days > 127:
+                    error_message = "Invalid timer days"
+                elif new_on_time < 0 or new_on_time > 1410:
+                    error_message = "Invalid on time"
+                elif new_off_time < 0 or new_off_time > 1410:
+                    error_message = "Invalid on time"
+                else:
+                    timers[timer_number - 1][0] = new_days
+                    timers[timer_number - 1][1] = new_on_time
+                    timers[timer_number - 1][2] = new_off_time
                     save_data()
                     response_obj = {
                         'status': 'OK',
                         'timer_number': timer_number,
-                        'time_set': new_time
+                        'new_days': new_days,
+                        'new_on_time': new_on_time,
+                        'new_off_time': new_off_time
                     }
                     response_builder.set_body_from_dict(response_obj)
-                else:
+                if error_message != "":
                     response_obj = {
                         'status': 'ERROR',
-                        'message': "Invalid time sent"
+                        'message': error_message
                     }
                     response_builder.set_body_from_dict(response_obj)
                     response_builder.set_status(400)
-            elif action == "set_timer_days":
-                # Set off time
-                timer_number = int(request.data()['timer_number'])
-                timer_day = int(request.data()['day'])
-                if timer_day >= 0 and timer_day <= 7:
-                    # mask with the nth bit set
-                    timer_day_mask = 1 << (timer_day - 1)
-                    current_timer_days = timers[timer_number - 1][0]
-                    # toggle the bit with xor
-                    new_timer_days = current_timer_days ^ timer_day_mask
-                    timers[timer_number - 1][0] = new_timer_days
-                    save_data()
-                    response_obj = {
-                        'status': 'OK',
-                        'timer_number': timer_number,
-                        'new_timer_days': new_timer_days
-                    }
-                    response_builder.set_body_from_dict(response_obj)
-                else:
-                    response_obj = {
-                        'status': 'ERROR',
-                        'message': "Invalid time sent"
-                    }
-                    response_builder.set_body_from_dict(response_obj)
-                    response_builder.set_status(400)
-
-
             else:
                 # unknown action
                 response_builder.set_status(404)
