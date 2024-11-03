@@ -203,10 +203,12 @@ function editTimer(timer) {
         // Disable controls
         toggleControlsDisabled(timer, true);
         // Change to edit icon
-        document.getElementById("btnT" + timer).innerHTML = "&#x1F589;";
+        document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
         // Hide cancel button
         document.getElementById("btnC" + timer).style.display="none";
         endChange();
+        // Get status after one second
+        setTimeout(getStatus, 1100);
     }
 }
 
@@ -214,7 +216,7 @@ function cancelTimer(timer) {
     // Disable controls
     toggleControlsDisabled(timer, true);
     // Change to edit icon
-    document.getElementById("btnT" + timer).innerHTML = "&#x1F589;";
+    document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
     // Hide cancel button
     document.getElementById("btnC" + timer).style.display="none";
     // Get original status
