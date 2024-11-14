@@ -237,7 +237,7 @@ function toggleControlsDisabled(timer, isDisabled) {
 
 // Read status when page is focused
 window.onfocus = function() {
-    getStatus();
+    setTimeout(getStatus, 450);
 }
-getStatus();
+setTimeout(getStatus, 450);
 

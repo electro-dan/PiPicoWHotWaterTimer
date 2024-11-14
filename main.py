@@ -160,7 +160,7 @@ def timer_check_interrupt(pin):
                 # If the on and off timer are not the same
                 if timer[1] != timer[2]:
                     # If the current time is between the on and off times, enable heating
-                    if current_time > timer[1] and current_time < timer[2]:
+                    if current_time >= timer[1] and current_time < timer[2]:
                         is_heating = True
 
         if boost_timer_countdown > 0:
