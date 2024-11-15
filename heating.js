@@ -1,65 +1,75 @@
-var isChanging = false;
-var changingTimeout;
+var isChanging = false; // Used to prevent SSE updating controls when being edited
+var isListening = false; // Used to prevent multiple SSE running
 
-// Called on load, then every second
+// SSE called on load, streams from pico to browser
+function streamStatus() {
+    if (!isListening) {
+        isListening = true;
+        var evtSrc = new EventSource("events");
+        evtSrc.onmessage = function(event) {
+            updateStatus(event.data);
+        }
+        evtSrc.onerror = function(error) {
+            console.log(error);
+            isListening = false;
+        }
+    }
+}
+
+// Legacy polling method (not used)
 function getStatus() {
-    const formData = new FormData();
-    formData.append("action", "get_status");
+    const jsonData = {
+        "action": "get_status"
+    };
     // Post back to the python service
     const xhttp = new XMLHttpRequest();
     xhttp.onload = function() {
-        var json_response = JSON.parse(this.responseText);
-        console.log(json_response);
+        updateStatus(this.responseText);
+    }
+    xhttp.open("POST", "/api", true);
+    xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhttp.send(JSON.stringify(jsonData));
+}
 
-        if (json_response.status == "OK") {
-            var dayOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-            document.getElementById("localTime").innerHTML = dayOfWeek[json_response.current_day - 1] + " " + formatTime(json_response.current_time) + " UTC";
-            document.getElementById("boostTimer").innerHTML = formatCountdown(json_response.boost_timer_countdown);
-            document.getElementById("heatingState").innerHTML = (json_response.heating_state ? "ENABLED" : "DISABLED");
-            document.getElementById("isHeating").innerHTML = (json_response.is_heating ? "ON" : "OFF");
-            if (!isChanging) {
-                const timerArr = json_response.timers;
-                var timer = 1;
-                for (var i = 0; i < timerArr.length; i++) {
-                    timer = i + 1;
-                    // Only set control if it is disabled (not editing)
-                    if (document.getElementById("t" + timer + "Day1").disabled) {
-                        // Days
-                        checkTimerDayBoxes(timer, timerArr[i][0]);
-                        // On time
-                        document.getElementById("t" + timer + "On").innerHTML = formatTime(timerArr[i][1]);
-                        document.getElementById("t" + timer + "OnInput").value = timerArr[i][1];
-                        // Off time
-                        document.getElementById("t" + timer + "Off").innerHTML = formatTime(timerArr[i][2]);
-                        document.getElementById("t" + timer + "OffInput").value = timerArr[i][2];
-                    }
+// Populate the fields and controls with the current status from the Pico's JSON response
+function updateStatus(strRequest) {
+    var json_response = JSON.parse(strRequest);
+    console.log(json_response);
+
+    if (json_response.status == "OK") {
+        var dayOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        document.getElementById("localTime").innerHTML = dayOfWeek[json_response.current_day - 1] + " " + formatTime(json_response.current_time) + " UTC";
+        document.getElementById("boostTimer").innerHTML = formatCountdown(json_response.boost_timer_countdown);
+        document.getElementById("heatingState").innerHTML = (json_response.heating_state ? "ENABLED" : "DISABLED");
+        document.getElementById("isHeating").innerHTML = (json_response.is_heating ? "ON" : "OFF");
+        if (!isChanging) {
+            const timerArr = json_response.timers;
+            var timer = 1;
+            for (var i = 0; i < timerArr.length; i++) {
+                timer = i + 1;
+                // Only set control if it is disabled (not editing)
+                if (document.getElementById("t" + timer + "Day1").disabled) {
+                    // Days
+                    checkTimerDayBoxes(timer, timerArr[i][0]);
+                    // On time
+                    document.getElementById("t" + timer + "On").innerHTML = formatTime(timerArr[i][1]);
+                    document.getElementById("t" + timer + "OnInput").value = timerArr[i][1];
+                    // Off time
+                    document.getElementById("t" + timer + "Off").innerHTML = formatTime(timerArr[i][2]);
+                    document.getElementById("t" + timer + "OffInput").value = timerArr[i][2];
                 }
-            }
-            if (json_response.boost_timer_countdown != "0") {
-                setTimeout(getStatus, 450);
             }
         }
     }
-    xhttp.open("POST", "/api", true);
-    xhttp.send(formData);
 }
 
-// Functions to prevent the interval reseting displayed values when changing a control
-function resetChanging() {
-    isChanging = false;
-}
-
+// Functions to prevent the interval resetting displayed values when changing a control
 function startChange() {
-    clearTimeout(changingTimeout);
     isChanging = true;
 }
 
-function timeoutChange() {
-    changingTimeout = setTimeout(resetChanging, 10000);
-}
-
 function endChange() {
-    changingTimeout = setTimeout(resetChanging, 1000);
+    isChanging = false;
 }
 
 // Global heating enable/disable
@@ -88,8 +98,6 @@ function triggerHeating() {
 
 // Set the target temperature
 function triggerBoost() {
-    startChange();
-
     const jsonData = {
         "action": "boost"
     };
@@ -102,8 +110,6 @@ function triggerBoost() {
         if (json_response.status == "OK") {
             // reset led indicator to none
             document.getElementById("boostTimer").innerHTML = formatCountdown(json_response.boost_timer_countdown);
-            // Get the status every second whilst boost is active
-            setTimeout(getStatus, 450);
         } else {
             alert("Error setting target temperature");
         }
@@ -111,8 +117,6 @@ function triggerBoost() {
     xhttp.open("POST", "/api", true);
     xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
     xhttp.send(JSON.stringify(jsonData));
-
-    endChange();
 }
 
 function checkTimerDayBoxes(timer, newTimerDays) {
@@ -130,9 +134,7 @@ function checkTimerDayBoxes(timer, newTimerDays) {
 
 // This function is used when the control slider is dragged
 function moveTime(timer, onOrOff) {
-    startChange();
     document.getElementById("t" + timer + onOrOff).innerHTML = formatTime(document.getElementById("t" + timer + onOrOff + "Input").value);
-    timeoutChange();
 }
 
 // Used by above functions to format the set time into 12h format hh:mm
@@ -207,8 +209,6 @@ function editTimer(timer) {
         // Hide cancel button
         document.getElementById("btnC" + timer).style.display="none";
         endChange();
-        // Get status after one second
-        setTimeout(getStatus, 1100);
     }
 }
 
@@ -219,8 +219,6 @@ function cancelTimer(timer) {
     document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
     // Hide cancel button
     document.getElementById("btnC" + timer).style.display="none";
-    // Get original status
-    getStatus();
 }
 
 function toggleControlsDisabled(timer, isDisabled) {
@@ -235,9 +233,10 @@ function toggleControlsDisabled(timer, isDisabled) {
     document.getElementById("t" + timer + "OnInput").disabled = isDisabled;
 }
 
-// Read status when page is focused
-window.onfocus = function() {
-    setTimeout(getStatus, 450);
-}
-setTimeout(getStatus, 450);
-
+// These events will start the server side event source to stream status
+// This one is for mobiles when the browser/tab resumes
+document.addEventListener("visibilitychange", streamStatus, false);
+// For desktops when tab is focused
+document.addEventListener("focus", streamStatus, false);
+// For initial window load
+window.addEventListener("load", streamStatus);

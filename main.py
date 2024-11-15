@@ -25,7 +25,9 @@ button_state = 0xFFFF
 is_heating = False # Default to off
 heating_state = True # Default to on
 boost_timer = 1800 # timer in seconds (30 minutes)
+boost_timer_add = 900 # timer increase in seconds (15 minutes)
 boost_timer_countdown = 0 # timer in seconds
+boost_pressed = 0
 
 # list of timers
 # timer list contains days (bitmask of 127), on time in minutes, off time in minutes
@@ -52,21 +54,8 @@ async def index(request):
 @app.route('/events')
 @with_sse
 async def events(request, sse):
-    count = 0
+    # Stream status to client every second
     while True:
-        count += 1
-        await sse.send({'counter': count})
-        # Pause between sending again
-        await uasyncio.sleep(1)
-
-@app.route('/api', methods=['POST'])
-async def api(request):
-    global heating_state
-    global boost_timer_countdown
-    global timers
-    
-    action = request.form.get('action')
-    if action == 'get_status':
         current_day = time.localtime()[6] + 1
         current_time = (time.localtime()[3] * 60) + time.localtime()[4]
         response_obj = {
@@ -78,12 +67,64 @@ async def api(request):
             'boost_timer_countdown': boost_timer_countdown,
             'timers': timers
         }
+        await sse.send(response_obj)
+        # Pause between sending again
+        await uasyncio.sleep(1)
+
+# Alternate GET api just returns status
+@app.get('/api')
+async def api_get(request):
+    current_day = time.localtime()[6] + 1
+    current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+    # Return current time, heating and timers status
+    response_obj = {
+        'status': 'OK',
+        'current_day': current_day,
+        'current_time': current_time,
+        'heating_state': heating_state,
+        'is_heating': is_heating,
+        'boost_timer_countdown': boost_timer_countdown,
+        'timers': timers
+    }
+    return response_obj
+
+# Essentially a basic REST api for settings - POST only, to one end point
+@app.post('/api')
+async def api_post(request):
+    global heating_state
+    global boost_pressed
+    global boost_timer_countdown
+    global timers
+    
+    action = request.json["action"]
+    if action == 'get_status':
+        current_day = time.localtime()[6] + 1
+        current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+        # Return current time, heating and timers status
+        response_obj = {
+            'status': 'OK',
+            'current_day': current_day,
+            'current_time': current_time,
+            'heating_state': heating_state,
+            'is_heating': is_heating,
+            'boost_timer_countdown': boost_timer_countdown,
+            'timers': timers
+        }
         return response_obj
     elif action == "boost":
+        # Execute a manual heating 'boost' timer
         if boost_timer_countdown == 0:
+            boost_pressed = 1
             boost_timer_countdown = boost_timer
+            heating_state = True # Boost will also enable the heating
         else:
-            boost_timer_countdown = 0
+            # Subsequent pushes of the boost button will increase boost timer by 15 minutes until 3 pushes
+            if boost_pressed < 3:
+                boost_timer_countdown += boost_timer_add
+                boost_pressed += 1
+            else:
+                boost_pressed = 0
+                boost_timer_countdown = 0
         
         response_obj = {
             'status': 'OK',
@@ -100,11 +141,13 @@ async def api(request):
         }
         return response_obj
     elif action == "set_timer":
+        # Change a timer days and on/off time (minutes of day)
         error_message = ""
-        timer_number = request.data()['timer_number']
-        new_days = int(request.data()['new_days'])
-        new_on_time = int(request.data()['new_on_time'])
-        new_off_time = int(request.data()['new_off_time'])
+        timer_number = request.json['timer_number']
+        new_days = int(request.json['new_days'])
+        new_on_time = int(request.json['new_on_time'])
+        new_off_time = int(request.json['new_off_time'])
+        # Validate inputs
         if timer_number < 1 or timer_number > 6:
             error_message = "Invalid timer number"
         elif new_days < 0 or new_days > 127:
@@ -112,7 +155,7 @@ async def api(request):
         elif new_on_time < 0 or new_on_time > 1410:
             error_message = "Invalid on time"
         elif new_off_time < 0 or new_off_time > 1410:
-            error_message = "Invalid on time"
+            error_message = "Invalid off time"
         else:
             timers[timer_number - 1][0] = new_days
             timers[timer_number - 1][1] = new_on_time
@@ -200,11 +243,11 @@ async def main():
     print('Starting hardware...')
     uasyncio.create_task(button_handler())
 
+    updated_today = False
+
     # start web server task
     print('Setting up webserver...')
-    app.run(debug=True, port=80)
-
-    updated_today = False
+    uasyncio.create_task(app.start_server(debug=True, port=80))
 
     while True:
         # This loop just monitors the WiFi connection and tries re-connects if disconnected
