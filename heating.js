@@ -156,6 +156,7 @@ function formatCountdown(countdownIn) {
 function editTimer(timer) {
     // Check state of a control
     if (document.getElementById("t" + timer + "Day1").disabled) {
+        startChange();
         // Enable controls
         toggleControlsDisabled(timer, false);
         // Show cancel button
@@ -163,8 +164,6 @@ function editTimer(timer) {
         // Change to save icon
         document.getElementById("btnT" + timer).innerHTML = "&#x1F4BE;";
     } else {
-        startChange();
-
         var newDays = 0;
         var daysTest = 1;
         // Loop from 1 to 7 - 1 = Monday
@@ -189,12 +188,7 @@ function editTimer(timer) {
             var json_response = JSON.parse(this.responseText);
             console.log(json_response);
 
-            if (json_response.status == "OK") {
-                // set the checkboxes
-                newTimerDays = json_response.new_timer_days
-                // Check the boxes based on the new set timer days
-                //checkTimerDayBoxes(timer, newTimerDays);
-            } else {
+            if (json_response.status != "OK") {
                 alert("Error setting timer - " + json_response.message);
             }
         }
@@ -208,7 +202,8 @@ function editTimer(timer) {
         document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
         // Hide cancel button
         document.getElementById("btnC" + timer).style.display="none";
-        endChange();
+        // Delay resuming the SSE by over a second, allowing time for the Pico to receive and response with the new state
+        setTimeout(endChange(), 1200);
     }
 }
 
@@ -219,6 +214,7 @@ function cancelTimer(timer) {
     document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
     // Hide cancel button
     document.getElementById("btnC" + timer).style.display="none";
+    endChange()
 }
 
 function toggleControlsDisabled(timer, isDisabled) {
