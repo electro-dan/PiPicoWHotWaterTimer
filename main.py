@@ -4,9 +4,10 @@ import ntptime
 from time import sleep
 import uasyncio
 from machine import Pin
-from RequestParser import RequestParser
-from ResponseBuilder import ResponseBuilder
 from WiFiConnection import WiFiConnection
+from microdot.microdot import Microdot
+from microdot.microdot import send_file
+from microdot.sse import with_sse
 from machine import WDT
 from machine import Timer
 
@@ -24,7 +25,9 @@ button_state = 0xFFFF
 is_heating = False # Default to off
 heating_state = True # Default to on
 boost_timer = 1800 # timer in seconds (30 minutes)
+boost_timer_add = 900 # timer increase in seconds (15 minutes)
 boost_timer_countdown = 0 # timer in seconds
+boost_pressed = 0
 
 # list of timers
 # timer list contains days (bitmask of 127), on time in minutes, off time in minutes
@@ -37,107 +40,147 @@ timers = [
     [0, 420, 420]
 ]
 
-# coroutine to handle HTTP request
-async def handle_request(reader, writer):
+app = Microdot()
+
+# root route handler
+@app.get('/')
+async def index(request):
+    return send_file('/index.html')
+
+@app.get('/heating.js')
+async def js(request):
+    return send_file('/heating.js')
+
+@app.route('/events')
+@with_sse
+async def events(request, sse):
+    # Stream status to client every second
+    while True:
+        current_day = time.localtime()[6] + 1
+        current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+        response_obj = {
+            'status': 'OK',
+            'current_day': current_day,
+            'current_time': current_time,
+            'heating_state': heating_state,
+            'is_heating': is_heating,
+            'boost_timer_countdown': boost_timer_countdown,
+            'timers': timers
+        }
+        await sse.send(response_obj)
+        # Pause between sending again
+        await uasyncio.sleep(1)
+
+# Alternate GET api just returns status
+@app.get('/api')
+async def api_get(request):
+    current_day = time.localtime()[6] + 1
+    current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+    # Return current time, heating and timers status
+    response_obj = {
+        'status': 'OK',
+        'current_day': current_day,
+        'current_time': current_time,
+        'heating_state': heating_state,
+        'is_heating': is_heating,
+        'boost_timer_countdown': boost_timer_countdown,
+        'timers': timers
+    }
+    return response_obj
+
+# Essentially a basic REST api for settings - POST only, to one end point
+@app.post('/api')
+async def api_post(request):
     global heating_state
+    global boost_pressed
     global boost_timer_countdown
     global timers
-    try:
-        # await allows other tasks to run while waiting for data
-        raw_request = await reader.read(2048)
-
-        request = RequestParser(raw_request)
-
-        response_builder = ResponseBuilder()
-
-        # filter out api request
-        if request.url_match("/api"):
-            action = request.get_action()
-            if action == 'get_status':
-                current_day = time.localtime()[6] + 1
-                current_time = (time.localtime()[3] * 60) + time.localtime()[4]
-                response_obj = {
-                    'status': 'OK',
-                    'current_day': current_day,
-                    'current_time': current_time,
-                    'heating_state': heating_state,
-                    'is_heating': is_heating,
-                    'boost_timer_countdown': boost_timer_countdown,
-                    'timers': timers
-                }
-                response_builder.set_body_from_dict(response_obj)
-            elif action == "boost":
-                if boost_timer_countdown == 0:
-                    boost_timer_countdown = boost_timer
-                else:
-                    boost_timer_countdown = 0
-                
-                response_obj = {
-                    'status': 'OK',
-                    'boost_timer_countdown': boost_timer_countdown
-                }
-                response_builder.set_body_from_dict(response_obj)
-            elif action == 'trigger_heating':
-                # Permanently turn heating off (holiday mode) or on
-                heating_state = not heating_state
-               
-                response_obj = {
-                    'status': 'OK',
-                    'heating_state': heating_state
-                }
-                response_builder.set_body_from_dict(response_obj)
-            elif action == "set_timer":
-                error_message = ""
-                timer_number = request.data()['timer_number']
-                new_days = int(request.data()['new_days'])
-                new_on_time = int(request.data()['new_on_time'])
-                new_off_time = int(request.data()['new_off_time'])
-                if timer_number < 1 or timer_number > 6:
-                    error_message = "Invalid timer number"
-                elif new_days < 0 or new_days > 127:
-                    error_message = "Invalid timer days"
-                elif new_on_time < 0 or new_on_time > 1410:
-                    error_message = "Invalid on time"
-                elif new_off_time < 0 or new_off_time > 1410:
-                    error_message = "Invalid on time"
-                else:
-                    timers[timer_number - 1][0] = new_days
-                    timers[timer_number - 1][1] = new_on_time
-                    timers[timer_number - 1][2] = new_off_time
-                    save_data()
-                    response_obj = {
-                        'status': 'OK',
-                        'timer_number': timer_number,
-                        'new_days': new_days,
-                        'new_on_time': new_on_time,
-                        'new_off_time': new_off_time
-                    }
-                    response_builder.set_body_from_dict(response_obj)
-                if error_message != "":
-                    response_obj = {
-                        'status': 'ERROR',
-                        'message': error_message
-                    }
-                    response_builder.set_body_from_dict(response_obj)
-                    response_builder.set_status(400)
-            else:
-                # unknown action
-                response_builder.set_status(404)
-
-        # try to serve static file
+    
+    action = request.json["action"]
+    if action == 'get_status':
+        current_day = time.localtime()[6] + 1
+        current_time = (time.localtime()[3] * 60) + time.localtime()[4]
+        # Return current time, heating and timers status
+        response_obj = {
+            'status': 'OK',
+            'current_day': current_day,
+            'current_time': current_time,
+            'heating_state': heating_state,
+            'is_heating': is_heating,
+            'boost_timer_countdown': boost_timer_countdown,
+            'timers': timers
+        }
+        return response_obj
+    elif action == "boost":
+        # Execute a manual heating 'boost' timer
+        if boost_timer_countdown == 0:
+            boost_pressed = 1
+            boost_timer_countdown = boost_timer
+            heating_state = True # Boost will also enable the heating
         else:
-            response_builder.serve_static_file(request.url, "/index.html")
-
-        # build response message
-        response_builder.build_response()
-        # send response back to client
-        writer.write(response_builder.response)
-        # allow other tasks to run while data being sent
-        await writer.drain()
-        await writer.wait_closed()
-
-    except OSError as e:
-        print('connection error ' + str(e.errno) + " " + str(e))
+            # Subsequent pushes of the boost button will increase boost timer by 15 minutes until 3 pushes
+            if boost_pressed < 3:
+                boost_timer_countdown += boost_timer_add
+                boost_pressed += 1
+            else:
+                boost_pressed = 0
+                boost_timer_countdown = 0
+        
+        response_obj = {
+            'status': 'OK',
+            'boost_timer_countdown': boost_timer_countdown
+        }
+        return response_obj
+    elif action == 'trigger_heating':
+        # Permanently turn heating off (holiday mode) or on
+        heating_state = not heating_state
+        
+        response_obj = {
+            'status': 'OK',
+            'heating_state': heating_state
+        }
+        return response_obj
+    elif action == "set_timer":
+        # Change a timer days and on/off time (minutes of day)
+        error_message = ""
+        timer_number = request.json['timer_number']
+        new_days = int(request.json['new_days'])
+        new_on_time = int(request.json['new_on_time'])
+        new_off_time = int(request.json['new_off_time'])
+        # Validate inputs
+        if timer_number < 1 or timer_number > 6:
+            error_message = "Invalid timer number"
+        elif new_days < 0 or new_days > 127:
+            error_message = "Invalid timer days"
+        elif new_on_time < 0 or new_on_time > 1410:
+            error_message = "Invalid on time"
+        elif new_off_time < 0 or new_off_time > 1410:
+            error_message = "Invalid off time"
+        else:
+            timers[timer_number - 1][0] = new_days
+            timers[timer_number - 1][1] = new_on_time
+            timers[timer_number - 1][2] = new_off_time
+            save_data()
+            response_obj = {
+                'status': 'OK',
+                'timer_number': timer_number,
+                'new_days': new_days,
+                'new_on_time': new_on_time,
+                'new_off_time': new_off_time
+            }
+            return response_obj
+        if error_message != "":
+            response_obj = {
+                'status': 'ERROR',
+                'message': error_message
+            }
+            return response_obj, 400
+    else:
+        response_obj = {
+                'status': 'ERROR',
+                'message': "Unknown action"
+            }
+        return response_obj, 400
 
 # Main timer interrupt - runs every second
 # This will activate / deactivate hot water based on whether the local time is within an active timer
@@ -160,7 +203,7 @@ def timer_check_interrupt(pin):
                 # If the on and off timer are not the same
                 if timer[1] != timer[2]:
                     # If the current time is between the on and off times, enable heating
-                    if current_time > timer[1] and current_time < timer[2]:
+                    if current_time >= timer[1] and current_time < timer[2]:
                         is_heating = True
 
         if boost_timer_countdown > 0:
@@ -200,12 +243,11 @@ async def main():
     print('Starting hardware...')
     uasyncio.create_task(button_handler())
 
+    updated_today = False
+
     # start web server task
     print('Setting up webserver...')
-    server = uasyncio.start_server(handle_request, "0.0.0.0", 80)
-    uasyncio.create_task(server)
-
-    updated_today = False
+    uasyncio.create_task(app.start_server(debug=False, port=80))
 
     while True:
         # This loop just monitors the WiFi connection and tries re-connects if disconnected
