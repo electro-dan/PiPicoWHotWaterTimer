@@ -48,7 +48,7 @@ async def index(request):
     return send_file('/index.html')
 
 @app.get('/heating.js')
-async def index(request):
+async def js(request):
     return send_file('/heating.js')
 
 @app.route('/events')
@@ -247,7 +247,7 @@ async def main():
 
     # start web server task
     print('Setting up webserver...')
-    uasyncio.create_task(app.start_server(debug=True, port=80))
+    uasyncio.create_task(app.start_server(debug=False, port=80))
 
     while True:
         # This loop just monitors the WiFi connection and tries re-connects if disconnected

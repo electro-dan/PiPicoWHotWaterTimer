@@ -89,7 +89,6 @@ function triggerHeating() {
         } else {
             alert("Error setting heating state");
         }
-
     }
     xhttp.open("POST", "/api", true);
     xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
@@ -189,7 +188,7 @@ function editTimer(timer) {
             console.log(json_response);
 
             if (json_response.status != "OK") {
-                alert("Error setting timer - " + json_response.message);
+                alert("Error setting timer: " + json_response.message);
             }
         }
         xhttp.open("POST", "/api", true);
@@ -214,7 +213,7 @@ function cancelTimer(timer) {
     document.getElementById("btnT" + timer).innerHTML = "&#x1F4DD;";
     // Hide cancel button
     document.getElementById("btnC" + timer).style.display="none";
-    endChange()
+    endChange();
 }
 
 function toggleControlsDisabled(timer, isDisabled) {
