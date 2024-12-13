@@ -1,11 +1,23 @@
 var isChanging = false; // Used to prevent SSE updating controls when being edited
-var isListening = false; // Used to prevent multiple SSE running
+var evtSrc;
+
+// https://www.slingacademy.com/article/javascript-checking-if-a-tab-is-currently-focused-active/
+var hidden, visibilityChange;
+if (typeof document.hidden !== "undefined") {
+    hidden = "hidden";
+    visibilityChange = "visibilitychange";
+} else if (typeof document.msHidden !== "undefined") {
+    hidden = 'msHidden';
+    visibilityChange = 'msvisibilitychange';
+} else if (typeof document.webkitHidden !== "undefined") {
+    hidden = 'webkitHidden';
+    visibilityChange = 'webkitvisibilitychange';
+}
 
 // SSE called on load, streams from pico to browser
 function streamStatus() {
-    if (!isListening) {
-        isListening = true;
-        var evtSrc = new EventSource("events");
+    if (!document[hidden] && !evtSrc) {
+        evtSrc = new EventSource("events");
         evtSrc.onmessage = function(event) {
             updateStatus(event.data);
         }
@@ -13,6 +25,9 @@ function streamStatus() {
             console.log(error);
             isListening = false;
         }
+    } else if (evtSrc) {
+        evtSrc.close();
+        evtSrc = null;
     }
 }
 
@@ -232,6 +247,6 @@ function toggleControlsDisabled(timer, isDisabled) {
 // This one is for mobiles when the browser/tab resumes
 document.addEventListener("visibilitychange", streamStatus, false);
 // For desktops when tab is focused
-document.addEventListener("focus", streamStatus, false);
+//document.addEventListener("focus", streamStatus, false);
 // For initial window load
-window.addEventListener("load", streamStatus);
+//window.addEventListener("load", streamStatus);

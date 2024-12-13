@@ -55,6 +55,7 @@ async def js(request):
 @with_sse
 async def events(request, sse):
     # Stream status to client every second
+    last_response_obj = {}
     while True:
         current_day = time.localtime()[6] + 1
         current_time = (time.localtime()[3] * 60) + time.localtime()[4]
@@ -67,7 +68,10 @@ async def events(request, sse):
             'boost_timer_countdown': boost_timer_countdown,
             'timers': timers
         }
-        await sse.send(response_obj)
+        if response_obj != last_response_obj:
+            last_response_obj = response_obj
+            await sse.send(response_obj)
+            
         # Pause between sending again
         await uasyncio.sleep(1)
 
