@@ -12,5 +12,32 @@
     ],
     "python.analysis.extraPaths": [
         "~/.micropico-stubs/included"
+    ],
+    "micropico.syncFileTypes": [
+        "py",
+        "log",
+        "json",
+        "xml",
+        "html",
+        "js",
+        "css",
+        "mpy"
+    ],
+    "micropico.pyIgnore": [
+        "**/.picowgo",
+        "**/.micropico",
+        "**/.vscode",
+        "**/.gitignore",
+        "**/.git",
+        "**/.DS_Store",
+        "**/project.pico-go",
+        "**/env",
+        "**/venv",
+        "**/.venv",
+        "**/.idea",
+        "**/picoenv",
+        "microdot/helpers.py",
+        "microdot/microdot.py",
+        "microdot/sse.py"
     ]
 }
