@@ -246,7 +246,12 @@ function toggleControlsDisabled(timer, isDisabled) {
 // These events will start the server side event source to stream status
 // This one is for mobiles when the browser/tab resumes
 document.addEventListener("visibilitychange", streamStatus, false);
+window.addEventListener('beforeunload', () => {
+	if (evtSrc)
+        evtSrc.close();
+});
+
 // For desktops when tab is focused
 //document.addEventListener("focus", streamStatus, false);
 // For initial window load
-//window.addEventListener("load", streamStatus);
+window.addEventListener("load", streamStatus);

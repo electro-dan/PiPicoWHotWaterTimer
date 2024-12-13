@@ -21,7 +21,8 @@
         "html",
         "js",
         "css",
-        "mpy"
+        "mpy",
+        "txt"
     ],
     "micropico.pyIgnore": [
         "**/.picowgo",
